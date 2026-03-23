@@ -1,0 +1,34 @@
+name: Claude PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+  issue_comment:
+    types: [created]
+
+jobs:
+  claude-review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: anthropic/claude-code-action@beta
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          model: claude-sonnet-4-5
+          trigger_phrase: "@claude"
+          auto_review_on_pr: true
+          custom_instructions: |
+            You are reviewing changes to the Algo-Merlin crypto trading system.
+
+            When reviewing PRs, check for:
+            - Adherence to the PR description format (What/Why/How/Testing)
+            - No direct commits to main (branch protection)
+            - API contract changes are reflected in docs/api-contracts.md
+            - Risk management rules are not weakened
+            - Agent tool definitions follow the format in docs/agents.md
+            - Sensitive data (API keys, secrets) not hardcoded
+
+            Be concise and constructive. Focus on important issues.

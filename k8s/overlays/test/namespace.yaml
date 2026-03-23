@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: algo-merlin-test
+  labels:
+    app: algo-merlin
+    env: test
