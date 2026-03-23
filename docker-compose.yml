@@ -1,0 +1,67 @@
+version: '3.8'
+
+# Algo-Merlin — Full Stack Docker Compose
+# This is the skeleton. Each service repo has its own Dockerfile.
+# Run from this directory after cloning all service repos alongside this one.
+
+services:
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: algomerlin
+      POSTGRES_USER: trader
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trader -d algomerlin"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ai-service:
+    build: ../algo-merlin-ai
+    environment:
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+      PLATFORM_URL: http://platform:8080
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  platform:
+    build: ../algo-merlin-platform
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/algomerlin
+      DB_USER: trader
+      DB_PASSWORD: ${DB_PASSWORD}
+      AI_SERVICE_URL: http://ai-service:8001
+      BINGX_API_KEY: ${BINGX_API_KEY}
+      BINGX_API_SECRET: ${BINGX_API_SECRET}
+      BINGX_BASE_URL: https://open-api-vst.bingx.com
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID}
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ai-service:
+        condition: service_healthy
+
+  ui:
+    build: ../algo-merlin-ui
+    ports:
+      - "80:80"
+    depends_on:
+      - platform
+    environment:
+      VITE_API_URL: http://localhost:8080
+
+volumes:
+  postgres_data:
