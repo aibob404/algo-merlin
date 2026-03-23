@@ -211,7 +211,36 @@ All services run in Docker. Only `platform` (API) and `ui` are exposed. AI servi
 
 ---
 
-## 10. Phased Roadmap
+## 10. Security
+
+| Concern | Solution |
+|---------|----------|
+| REST API unauthorized access | JWT authentication on all `/api/*` endpoints |
+| Tool execution unauthenticated | Shared secret token (`TOOL_EXECUTION_TOKEN`) on `/api/tools/execute` |
+| Prompt injection via strategy_hint | Whitelist enforced at Platform + DB CHECK constraint |
+| Secrets in env vars | Volume-mounted K8s Secrets (files, not env vars) |
+| Trading param out-of-range | DB CHECK constraints + Platform validation layer |
+
+See [ADR-006](adr/006-jwt-authentication.md) for authentication decisions.
+
+---
+
+## 11. Reliability Highlights
+
+| Pattern | Where |
+|---------|-------|
+| Write-ahead PENDING row | Before every BingX order call |
+| Startup position reconciliation | Platform boot sequence |
+| Circuit breakers | AI Service, BingX, OpenRouter |
+| Graceful shutdown | SIGTERM handler — waits for in-flight decisions |
+| Idempotent orders | `clientOrderId = trade.id` on BingX |
+| Duplicate candle guard | `lastAnalyzedClose` per bot in trading loop |
+
+See [docs/reliability.md](reliability.md) for full failure mode analysis.
+
+---
+
+## 12. Phased Roadmap
 
 ### Phase 1 — MVP
 - [ ] Single bot, single pair trading

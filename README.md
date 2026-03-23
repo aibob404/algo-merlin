@@ -92,6 +92,8 @@ See [docs/setup.md](docs/setup.md) for full setup guide.
 | [Agent Design](docs/agents.md) | AI agent tools, flow, and prompts |
 | [API Contracts](docs/api-contracts.md) | Service interfaces and data models |
 | [ADR Index](docs/adr/) | Architecture Decision Records |
+| [Database Schema](docs/database-schema.md) | Full PostgreSQL schema, state machine, indexes |
+| [Reliability Design](docs/reliability.md) | Circuit breakers, timeouts, failure patterns |
 | [Setup Guide](docs/setup.md) | How to run locally and on server |
 
 ---

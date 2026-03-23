@@ -15,7 +15,18 @@ This approach means the agent can adapt its analysis depth per situation — som
 
 ---
 
-## 2. Agent Loop
+## 2. Research Validation
+
+Industry research confirms the agentic approach is the right direction:
+
+- **[TradingAgents (arXiv 2412.20138)](https://arxiv.org/abs/2412.20138)** — multi-agent LLM framework with 7 specialized agents (Technical Analyst, Sentiment Analyst, Risk Manager, Trader, etc.) shows improvements in cumulative return, Sharpe ratio, and max drawdown vs single-agent and rule-based baselines.
+- **[LLM_trader](https://github.com/qrak/LLM_trader)** — uses OpenRouter (same as us) with a "Council of Models" and memory-augmented reasoning.
+- **2025 competition results** — specialized agents with custom logic beat GPT-5, Gemini Pro, and DeepSeek in live trading competitions ([CoinDesk](https://www.coindesk.com/business/2025/12/13/crypto-s-machine-learning-iphone-moment-comes-closer-as-ai-agents-trade-the-market)).
+- **Hybrid LLM+RL** outperforms pure LLM in 4 of 6 tested assets — considered for Phase 3.
+
+---
+
+## 3. Agent Loop
 
 ```
 SYSTEM PROMPT (strategy context, risk rules, output format)
@@ -45,10 +56,47 @@ USER MESSAGE ("Analyze BTC-USDT 1h and decide")
 ```
 
 Max tool call iterations: **10** (safety limit to prevent infinite loops).
+- At iteration 9: inject *"Make your final decision now."* into conversation
+- Hard timeout: 30s on the entire agent loop (separate from per-tool 10s timeout)
+- If max iterations or timeout reached without decision → return **HOLD**
 
 ---
 
-## 3. Tools — MVP
+## 4. Memory-Augmented Context (MVP)
+
+Every agent decision request includes the **last 5 decisions + outcomes** for this bot. This allows the agent to learn from its own session history and avoid repeating mistakes.
+
+Passed as part of the `/agent/decide` request:
+```json
+{
+  "recentDecisions": [
+    {
+      "timestamp": "2025-03-23T09:00:00Z",
+      "action": "BUY",
+      "confidence": 0.82,
+      "reasoning": "RSI oversold, MACD bullish cross",
+      "outcome": "TP_HIT",
+      "pnl_pct": 2.8
+    },
+    {
+      "timestamp": "2025-03-23T08:00:00Z",
+      "action": "HOLD",
+      "confidence": 0.65,
+      "reasoning": "Unclear trend, waiting for confirmation",
+      "outcome": null
+    }
+  ]
+}
+```
+
+System prompt addition:
+> *"Here are your last 5 decisions and their outcomes. Use this to calibrate your confidence and avoid repeating mistakes in similar market conditions."*
+
+Source: Validated by [LLM_trader](https://github.com/qrak/LLM_trader) and [TradingAgents](https://arxiv.org/abs/2412.20138) research.
+
+---
+
+## 5. Tools — MVP
 
 ### `get_candles`
 Fetch raw OHLCV candles from BingX.
@@ -158,7 +206,7 @@ Close an existing open position.
 
 ---
 
-## 4. Tools — Phase 2
+## 6. Tools — Phase 2
 
 | Tool | Description |
 |------|-------------|
@@ -169,7 +217,7 @@ Close an existing open position.
 
 ---
 
-## 5. System Prompt
+## 7. System Prompt
 
 The system prompt sets the agent's personality, constraints, and output expectations.
 It is configurable per bot via `strategy_hint`.
@@ -208,7 +256,7 @@ TIMEFRAME: {timeframe}
 
 ---
 
-## 6. Decision Output Format
+## 8. Decision Output Format
 
 The agent must end its reasoning with a structured JSON decision:
 
@@ -224,7 +272,7 @@ The agent must end its reasoning with a structured JSON decision:
 
 ---
 
-## 7. LLM Models (via OpenRouter)
+## 9. LLM Models (via OpenRouter)
 
 | Model | Use case |
 |-------|----------|
@@ -238,13 +286,32 @@ Model is configurable per bot.
 
 ---
 
-## 8. Safety & Guardrails
+## 10. Safety & Guardrails
 
 | Guardrail | Where enforced |
 |-----------|---------------|
 | Max 1% risk per trade | Platform (Risk Manager) |
 | Max 1 position per symbol per bot | Platform (before order execution) |
-| Stop-loss range 0.3-5% | Platform (rejects out-of-range values) |
+| Stop-loss range 0.3-5% | Platform + DB CHECK constraint |
+| Take-profit range 0.5-15% | Platform + DB CHECK constraint |
+| `strategy_hint` whitelist | Platform + DB CHECK constraint (prevents prompt injection) |
 | Max 10 tool calls per decision | AI Service (agent loop limit) |
+| Agent loop hard timeout | AI Service (30s total) |
+| AI Service down → HOLD | Platform (circuit breaker fallback) |
 | Order rejected if balance insufficient | Platform |
-| All decisions logged with full reasoning | Platform (DB) |
+| All decisions logged with full reasoning | DB (agent_decisions — immutable) |
+| Tool execution requires auth token | Platform (shared secret on /tools/execute) |
+
+---
+
+## 11. Phase 2+ Roadmap (Research-Validated)
+
+Based on [TradingAgents paper](https://arxiv.org/abs/2412.20138) and industry research:
+
+| Phase | Enhancement | Expected Impact |
+|-------|------------|----------------|
+| **Phase 2** | Bull/Bear researcher debate before trader agent decides | Better decision quality, fewer false signals |
+| **Phase 2** | News sentiment tool (FinGPT-style) | Catches macro events indicators miss |
+| **Phase 2** | Model council (2-3 LLMs vote, take consensus) | Higher confidence decisions |
+| **Phase 3** | Vision tool — screenshot chart → vision model | Multi-modal signal |
+| **Phase 3** | RL fine-tuning on own trade history | Continuous improvement |
